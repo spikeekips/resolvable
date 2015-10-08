@@ -33,4 +33,11 @@ ifneq ($(CIRCLE_BRANCH), release)
 	echo build-$$CIRCLE_BUILD_NUM > VERSION
 endif
 
+docker:
+	mkdir -p build
+	docker build -t $(NAME):$(VERSION) .
+	docker save $(NAME):$(VERSION) | gzip -9 > build/$(NAME)_$(VERSION).tar.gz
+	docker rmi $(NAME):$(VERSION)
+	gzip -dc build/$(NAME)_$(VERSION).tar.gz | docker load
+
 .PHONY: build release

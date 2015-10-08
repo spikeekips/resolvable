@@ -1,4 +1,4 @@
-FROM alpine:3.1
+FROM spikeekips/ubuntu
 ENTRYPOINT ["/bin/resolvable"]
 
 COPY ./config /config
