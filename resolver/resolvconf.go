@@ -41,6 +41,10 @@ func getopt(name, def string) string {
 func updateResolvConf(insert, path string) error {
 	log.Println("updating resolv.conf:", path)
 
+	preserve_ns_value, found := os.LookupEnv("RESOLVABLE_PRESERVE_NS")
+	preserve_ns := found && preserve_ns_value == "true"
+	log.Println("preserve the exsiting NS: ", preserve_ns)
+
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return err
@@ -68,9 +72,10 @@ func updateResolvConf(insert, path string) error {
 		if line == "" {
 			continue
 		}
+
 		if insert == "" {
 			line = strings.TrimLeft(line, "# ")
-		} else {
+		} else if !preserve_ns {
 			line = "# " + line
 		}
 		if _, err = f.WriteString(line); err != nil {

@@ -1,9 +1,6 @@
-FROM spikeekips/ubuntu
-ENTRYPOINT ["/bin/resolvable"]
+FROM busybox
 
+ENTRYPOINT ["/resolvable"]
+
+COPY ./resolvable /resolvable
 COPY ./config /config
-COPY . /src
-RUN cd /src && ./build.sh "$(cat VERSION)"
-
-ONBUILD COPY ./modules.go /src/modules.go
-ONBUILD RUN cd /src && ./build.sh "$(cat VERSION)-custom"

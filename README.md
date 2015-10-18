@@ -63,3 +63,15 @@ To run an example `consul` container, supporting DNS queries for the `.consul` d
 See this article on [Docker network configuration](https://docs.docker.com/articles/networking/) for additional details on the Docker bridge interface.
 
 <img src="https://ga-beacon.appspot.com/UA-58928488-2/resolvable/readme?pixel" />
+
+## To keep the existing Nameserver
+
+By default, the resolvable makes the parent's nameserver addresses to be disabled. If you don't want this, just add new environment variable, `RESOLVABLE_PRESERVE_NS=true`.
+
+	docker run -d \
+		--hostname resolvable \
+		-v /var/run/docker.sock:/tmp/docker.sock \
+		-v /etc/resolv.conf:/tmp/resolv.conf \
+		-e RESOLVABLE_PRESERVE_NS=true \
+		mgood/resolvable
+

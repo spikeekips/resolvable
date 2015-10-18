@@ -2,3 +2,5 @@ release/
 build/
 .*.sw?
 .sw?
+tmp/
+/resolvable

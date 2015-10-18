@@ -13,9 +13,13 @@ dev:
 		$(NAME):dev
 
 build:
-	mkdir -p build
-	docker build -t $(NAME):$(VERSION) .
-	docker save $(NAME):$(VERSION) | gzip -9 > build/$(NAME)_$(VERSION).tgz
+	docker build -t $(NAME):$(VERSION)-build -f Dockerfile.build .
+	docker rm -f $(NAME).$(VERSION)-build &>/dev/null || true
+	docker run -it -d --name $(NAME).$(VERSION)-build $(NAME):$(VERSION)-build /bin/bash
+	mkdir -p ./tmp
+	docker cp $(NAME).$(VERSION)-build:/resolvable ./resolvable
+	docker rm -f $(NAME).$(VERSION)-build &>/dev/null || true
+	docker build -t $(NAME):$(VERSION) -f Dockerfile .
 
 test:
 	GOMAXPROCS=4 go test -v ./... -race
