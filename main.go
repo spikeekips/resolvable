@@ -231,7 +231,7 @@ func run() error {
 	defer dnsResolver.Close()
 
 	var gateway net.IP
-	out, _ := exec.Command("/sbin/ip", "route").Output()
+	out, _ := exec.Command("ip", "route").Output()
 	for _, v := range strings.Split(string(out), "\n") {
 		if !strings.HasPrefix(v, "default ") {
 			continue
