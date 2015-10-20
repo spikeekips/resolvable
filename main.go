@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -228,6 +229,26 @@ func run() error {
 		return err
 	}
 	defer dnsResolver.Close()
+
+	var gateway net.IP
+	out, _ := exec.Command("/sbin/ip", "route").Output()
+	for _, v := range strings.Split(string(out), "\n") {
+		if !strings.HasPrefix(v, "default ") {
+			continue
+		}
+		gateway = net.ParseIP(strings.Split(v, " ")[2])
+		break
+	}
+	if gateway == nil {
+		return errors.New("failed to find the gateway address.")
+	}
+
+	dockerhost_name := getopt("DOCKERHOST_NAME", "dockerhost")
+	err = dnsResolver.AddHost(dockerhost_name, gateway, dockerhost_name, dockerhost_name)
+	if err != nil {
+		return errors.New("failed to add the gateway address.")
+	}
+	log.Printf("registered gateway ip, `%v` as `%s`", gateway, dockerhost_name)
 
 	localDomain := "docker"
 	dnsResolver.AddUpstream(localDomain, nil, 0, localDomain)
