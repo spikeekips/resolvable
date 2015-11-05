@@ -64,14 +64,16 @@ See this article on [Docker network configuration](https://docs.docker.com/artic
 
 <img src="https://ga-beacon.appspot.com/UA-58928488-2/resolvable/readme?pixel" />
 
-## To keep the existing Nameserver
+## Follow the (`/etc/`)`hosts` file 
 
-By default, the resolvable makes the parent's nameserver addresses to be disabled. If you don't want this, just add new environment variable, `RESOLVABLE_PRESERVE_NS=true`.
+By default, the resolvable keeps watching the given hosts file and tries to add or remove the records from it.
 
 	docker run -d \
 		--hostname resolvable \
 		-v /var/run/docker.sock:/tmp/docker.sock \
 		-v /etc/resolv.conf:/tmp/resolv.conf \
-		-e RESOLVABLE_PRESERVE_NS=true \
+		-v /tmp/hosts:/tmp/hosts \
+		-e HOSTS_FILE=/tmp/hosts \
 		mgood/resolvable
 
+With the shell environment variable, `HOSTS_FILE`, we can set the hosts file.

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"log"
@@ -8,10 +10,13 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
+	"github.com/go-fsnotify/fsnotify"
 	"github.com/miekg/dns"
 
 	"github.com/gliderlabs/resolvable/resolver"
@@ -187,6 +192,139 @@ func registerContainers(docker *dockerapi.Client, events chan *dockerapi.APIEven
 	return errors.New("docker event loop closed")
 }
 
+var hostsFile string = "/tmp/hosts"
+
+var hostsFileMap map[string][]string
+
+func readHostsFile(dns resolver.Resolver) {
+	log.Println("trying to read hosts file, `%v`", hostsFile)
+
+	if hostsFileMap == nil {
+		hostsFileMap = map[string][]string{}
+	}
+
+	nextHostsFileMap := map[string][]string{}
+
+	inFile, _ := os.Open(hostsFile)
+	defer inFile.Close()
+	scanner := bufio.NewScanner(inFile)
+	scanner.Split(bufio.ScanLines)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		r0, _ := regexp.Compile("#.*")
+		r1, _ := regexp.Compile("[\\s][\\s]*")
+		seperated := r1.Split(r0.ReplaceAllString(line, ""), -1)
+
+		if len(seperated) < 2 {
+			log.Printf("error: invalid host line, skipped: `%s`", line)
+			continue
+		}
+
+		if net.ParseIP(seperated[0]) == nil {
+			log.Printf("error: invalid host line, skipped: `%s`", line)
+			continue
+		}
+
+		for i := 1; i < len(seperated); i++ {
+			nextHostsFileMap[fmt.Sprintf("%x", md5.Sum([]byte(seperated[i])))] =
+				[]string{seperated[0], seperated[i]}
+		}
+	}
+	log.Printf("found %v records from hosts file, `%v`.", len(nextHostsFileMap), nextHostsFileMap)
+
+	isSameRecord := func(a []string, b []string) bool {
+		return md5.Sum([]byte(strings.Join(a, ":"))) == md5.Sum([]byte(strings.Join(b, ":")))
+	}
+
+	{
+		for k, v := range nextHostsFileMap {
+			if old, ok := hostsFileMap[k]; ok {
+				if isSameRecord(old, v) {
+					log.Println("same host and same ip: `%v`.", v)
+					continue
+				} else {
+					log.Println("same host, but different ip: `%v`.", v)
+				}
+			}
+			dns.RemoveHost(k)
+			if dns.AddHost(k, net.ParseIP(v[0]), v[1]) != nil {
+				log.Println(fmt.Errorf("failed to add the host, `%v`.", v))
+				continue
+			}
+			log.Printf("newly added the host, %v: %v", k, v)
+		}
+	}
+
+	{
+		for k, v := range hostsFileMap {
+			if _, ok := nextHostsFileMap[k]; ok {
+				continue
+			}
+			if dns.RemoveHost(k) != nil {
+				log.Println(fmt.Errorf("failed to remove the host, `%v`.", v))
+				continue
+			}
+			log.Printf("removed the host, %v: %v", k, v)
+		}
+	}
+
+	hostsFileMap = nextHostsFileMap
+}
+
+func monitorHostsFile(dns resolver.Resolver) error {
+	hostsFile = getopt("HOSTS_FILE", hostsFile)
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
+	}
+	defer watcher.Close()
+
+	loadFile := func() {
+		log.Printf("trying to load hosts file, `%v`", hostsFile)
+		for {
+			if _, err := os.Stat(hostsFile); err != nil || os.IsNotExist(err) {
+				log.Printf("failed to find `%s`", hostsFile)
+				time.Sleep(3000 * time.Millisecond)
+
+				continue
+			}
+			break
+		}
+		err = watcher.Add(hostsFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	go func() {
+		for {
+			select {
+			case event := <-watcher.Events:
+				log.Println("event:", event)
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					log.Println("modified file:", event.Name)
+					readHostsFile(dns)
+				} else if event.Op&fsnotify.Remove == fsnotify.Remove {
+					log.Println("removed file:", event.Name)
+					loadFile()
+					readHostsFile(dns)
+				}
+			case err := <-watcher.Errors:
+				log.Println("error:", err)
+			}
+		}
+	}()
+
+	loadFile()
+	readHostsFile(dns)
+
+	<-make(chan bool)
+	return nil
+}
+
 func run() error {
 	// set up the signal handler first to ensure cleanup is handled if a signal is
 	// caught while initializing
@@ -273,6 +411,10 @@ func run() error {
 	}()
 	go func() {
 		exitReason <- registerContainers(docker, nil, dnsResolver, localDomain, hostIP)
+	}()
+
+	go func() {
+		exitReason <- monitorHostsFile(dnsResolver)
 	}()
 
 	return <-exitReason
