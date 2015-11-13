@@ -16,7 +16,6 @@ build:
 	docker build -t $(NAME):$(VERSION)-build -f Dockerfile.build .
 	docker rm -f $(NAME).$(VERSION)-build &>/dev/null || true
 	docker run -it -d --name $(NAME).$(VERSION)-build $(NAME):$(VERSION)-build /bin/bash
-	mkdir -p ./tmp
 	docker cp $(NAME).$(VERSION)-build:/resolvable ./resolvable
 	docker rm -f $(NAME).$(VERSION)-build &>/dev/null || true
 	docker build -t $(NAME):$(VERSION) -f Dockerfile .

@@ -74,7 +74,7 @@ func updateResolvConf(insert, path string) error {
 		}
 
 		if insert == "" && !preserve_ns {
-			line = strings.TrimLeft(line, "# ")
+			line = strings.TrimPrefix(line, "# ")
 		} else if !preserve_ns {
 			line = "# " + line
 		}
