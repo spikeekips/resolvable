@@ -19,7 +19,7 @@ import (
 	"github.com/go-fsnotify/fsnotify"
 	"github.com/miekg/dns"
 
-	"github.com/gliderlabs/resolvable/resolver"
+	"github.com/spikeekips/resolvable/resolver"
 
 	dockerapi "github.com/fsouza/go-dockerclient"
 )
@@ -170,11 +170,6 @@ func registerContainers(docker *dockerapi.Client, events chan *dockerapi.APIEven
 		}
 	}
 
-	if err = dns.Listen(); err != nil {
-		return err
-	}
-	defer dns.Close()
-
 	for msg := range events {
 		go func(msg *dockerapi.APIEvents) {
 			switch msg.Status {
@@ -197,7 +192,7 @@ var hostsFile string = "/tmp/hosts"
 var hostsFileMap map[string][]string
 
 func readHostsFile(dns resolver.Resolver) {
-	log.Println("trying to read hosts file, `%v`", hostsFile)
+	log.Printf("trying to read hosts file, `%v`", hostsFile)
 
 	if hostsFileMap == nil {
 		hostsFileMap = map[string][]string{}
@@ -242,15 +237,15 @@ func readHostsFile(dns resolver.Resolver) {
 		for k, v := range nextHostsFileMap {
 			if old, ok := hostsFileMap[k]; ok {
 				if isSameRecord(old, v) {
-					log.Println("same host and same ip: `%v`.", v)
+					log.Printf("same host and same ip: `%v`.", v)
 					continue
 				} else {
-					log.Println("same host, but different ip: `%v`.", v)
+					log.Printf("same host, but different ip: `%v`.", v)
 				}
 			}
 			dns.RemoveHost(k)
 			if dns.AddHost(k, net.ParseIP(v[0]), v[1]) != nil {
-				log.Println(fmt.Errorf("failed to add the host, `%v`.", v))
+				log.Printf("failed to add the host, `%v`.", v)
 				continue
 			}
 			log.Printf("newly added the host, %v: %v", k, v)
@@ -263,7 +258,7 @@ func readHostsFile(dns resolver.Resolver) {
 				continue
 			}
 			if dns.RemoveHost(k) != nil {
-				log.Println(fmt.Errorf("failed to remove the host, `%v`.", v))
+				log.Printf("failed to remove the host, `%v`.", v)
 				continue
 			}
 			log.Printf("removed the host, %v: %v", k, v)
@@ -337,11 +332,6 @@ func run() error {
 		exitReason <- nil
 	}()
 
-	docker, err := dockerapi.NewClient(getopt("DOCKER_HOST", "unix:///tmp/docker.sock"))
-	if err != nil {
-		return err
-	}
-
 	address, err := ipAddress()
 	if err != nil {
 		return err
@@ -368,28 +358,50 @@ func run() error {
 	}
 	defer dnsResolver.Close()
 
-	var gateway net.IP
-	out, _ := exec.Command("ip", "route").Output()
-	for _, v := range strings.Split(string(out), "\n") {
-		if !strings.HasPrefix(v, "default ") {
-			continue
+	go func() error {
+		if err = dnsResolver.Listen(); err != nil {
+			return err
 		}
-		gateway = net.ParseIP(strings.Split(v, " ")[2])
-		break
-	}
-	if gateway == nil {
-		return errors.New("failed to find the gateway address.")
-	}
+		log.Printf("Listening port, %d...", dnsResolver.Port)
 
-	dockerhost_name := getopt("DOCKERHOST_NAME", "dockerhost")
-	err = dnsResolver.AddHost(dockerhost_name, gateway, dockerhost_name, dockerhost_name)
-	if err != nil {
-		return errors.New("failed to add the gateway address.")
-	}
-	log.Printf("registered gateway ip, `%v` as `%s`", gateway, dockerhost_name)
+		return nil
+	}()
 
-	localDomain := "docker"
-	dnsResolver.AddUpstream(localDomain, nil, 0, localDomain)
+	// Docker
+	var docker *dockerapi.Client
+	var localDomain string
+
+	without_docker := getopt("WITHOUT_DOCKER", "0") == "1"
+	log.Printf("WITHOUT_DOCKER=%v", without_docker)
+	if !without_docker {
+		docker, err = dockerapi.NewClient(getopt("DOCKER_HOST", "unix:///tmp/docker.sock"))
+		if err != nil {
+			return err
+		}
+
+		var gateway net.IP
+		out, _ := exec.Command("ip", "route").Output()
+		for _, v := range strings.Split(string(out), "\n") {
+			if !strings.HasPrefix(v, "default ") {
+				continue
+			}
+			gateway = net.ParseIP(strings.Split(v, " ")[2])
+			break
+		}
+		if gateway == nil {
+			return errors.New("failed to find the gateway address.")
+		}
+
+		dockerhost_name := getopt("DOCKERHOST_NAME", "dockerhost")
+		err = dnsResolver.AddHost(dockerhost_name, gateway, dockerhost_name, dockerhost_name)
+		if err != nil {
+			return errors.New("failed to add the gateway address.")
+		}
+		log.Printf("registered gateway ip, `%v` as `%s`", gateway, dockerhost_name)
+
+		localDomain = "docker"
+		dnsResolver.AddUpstream(localDomain, nil, 0, localDomain)
+	}
 
 	resolvConfig, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 	if err != nil {
@@ -409,9 +421,12 @@ func run() error {
 		dnsResolver.Wait()
 		exitReason <- errors.New("dns resolver exited")
 	}()
-	go func() {
-		exitReason <- registerContainers(docker, nil, dnsResolver, localDomain, hostIP)
-	}()
+
+	if !without_docker {
+		go func() {
+			exitReason <- registerContainers(docker, nil, dnsResolver, localDomain, hostIP)
+		}()
+	}
 
 	go func() {
 		exitReason <- monitorHostsFile(dnsResolver)

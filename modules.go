@@ -1,6 +1,6 @@
 package main
 
 import (
-	_ "github.com/gliderlabs/resolvable/resolver"
-	_ "github.com/gliderlabs/resolvable/systemd"
+	_ "github.com/spikeekips/resolvable/resolver"
+	_ "github.com/spikeekips/resolvable/systemd"
 )

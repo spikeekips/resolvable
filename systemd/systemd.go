@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/gliderlabs/resolvable/resolver"
+	"github.com/spikeekips/resolvable/resolver"
 
 	"github.com/coreos/go-systemd/daemon"
 	"github.com/coreos/go-systemd/dbus"

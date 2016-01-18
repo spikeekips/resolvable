@@ -6,7 +6,7 @@ dev:
 		|| docker build -f Dockerfile.dev -t $(NAME):dev .
 	@docker run --rm \
 		--hostname $(NAME) \
-		-v $(PWD):/go/src/github.com/gliderlabs/resolvable \
+		-v $(PWD):/go/src/github.com/spikeekips/resolvable \
 		-v $(PWD)/config:/config \
 		-v /var/run/docker.sock:/tmp/docker.sock \
 		-v /etc/resolv.conf:/tmp/resolv.conf \
@@ -27,7 +27,7 @@ release:
 	rm -rf release && mkdir release
 	go get github.com/progrium/gh-release/...
 	cp build/* release
-	gh-release create gliderlabs/$(NAME) $(VERSION) \
+	gh-release create spikeekips/$(NAME) $(VERSION) \
 		$(shell git rev-parse --abbrev-ref HEAD) $(VERSION)
 
 circleci:

@@ -13,12 +13,12 @@ V=$(gvm listall | sed -e 's/^   //g' | grep '^go[0-9]' | grep -v rc | grep -v be
 gvm install go1.4.3 && gvm use go1.4.3  
 gvm install ${V} && gvm use ${V}
 
-mkdir -p /src /go/src/github.com/gliderlabs
-cp -r /src /go/src/github.com/gliderlabs/resolvable
+mkdir -p /src /go/src/github.com/spikeekips
+cp -r /src /go/src/github.com/spikeekips/resolvable
 
 export GOPATH=/go
 
-cd /go/src/github.com/gliderlabs/resolvable
+cd /go/src/github.com/spikeekips/resolvable
 go get
 
 export GO_EXTLINK_ENABLED=0
