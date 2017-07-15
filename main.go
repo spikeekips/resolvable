@@ -358,14 +358,10 @@ func run() error {
 	}
 	defer dnsResolver.Close()
 
-	go func() error {
-		if err = dnsResolver.Listen(); err != nil {
-			return err
-		}
-		log.Printf("Listening port, %d...", dnsResolver.Port)
-
-		return nil
-	}()
+	if err = dnsResolver.Listen(); err != nil {
+		log.Panicf("[error] %v", err)
+	}
+	log.Printf("Listening port, %d...", dnsResolver.Port)
 
 	// Docker
 	var docker *dockerapi.Client

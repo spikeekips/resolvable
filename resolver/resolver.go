@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -44,8 +46,17 @@ type dnsResolver struct {
 }
 
 func NewResolver() (*dnsResolver, error) {
+	var port = 53
+	if p := os.Getenv("PORT"); p != "" {
+		var err error
+		port, err = strconv.Atoi(p)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &dnsResolver{
-		Port:     53,
+		Port:     port,
 		hosts:    make(map[string]*hostsEntry),
 		upstream: make(map[string]*serversEntry),
 		stopped:  make(chan struct{}),

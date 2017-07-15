@@ -1,7 +1,7 @@
 NAME=resolvable
 VERSION=$(shell cat VERSION)
 
-dev:
+dev-docker:
 	@docker history $(NAME):dev &> /dev/null \
 		|| docker build -f Dockerfile.dev -t $(NAME):dev .
 	@docker run --rm \
@@ -12,7 +12,7 @@ dev:
 		-v /etc/resolv.conf:/tmp/resolv.conf \
 		$(NAME):dev
 
-build:
+build-docker:
 	docker build -t $(NAME):$(VERSION)-build -f Dockerfile.build .
 	docker rm -f $(NAME).$(VERSION)-build &>/dev/null || true
 	docker run -it -d --name $(NAME).$(VERSION)-build $(NAME):$(VERSION)-build /bin/bash
@@ -36,7 +36,7 @@ ifneq ($(CIRCLE_BRANCH), release)
 	echo build-$$CIRCLE_BUILD_NUM > VERSION
 endif
 
-docker:
+docker-save:
 	mkdir -p build
 	docker build -t $(NAME):$(VERSION) .
 	docker save $(NAME):$(VERSION) | gzip -9 > build/$(NAME)_$(VERSION).tar.gz

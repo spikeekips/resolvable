@@ -1,14 +1,13 @@
 # vim: set ft=Dockerfile:
 
-FROM spikeekips/golang
+FROM golang:1.8
 
 COPY ./modules.go $GOPATH/src/modules.go
 COPY . $GOPATH/src/github.com/spikeekips/resolvable
-COPY ./build.sh /build.sh
 
 ENV GO_EXTLINK_ENABLED=0
 ENV CGO_ENABLED=0
 
 WORKDIR ${GOPATH}/src/github.com/spikeekips/resolvable
 RUN go get
-RUN go build -x --ldflags "-extldflags '-static' -X main.Version=$1" -o /resolvable
+RUN go build -x --ldflags "-extldflags '-static' -X main.Version=$(cat ./VERSION)-$(date '+%Y%m%d%H%M%S')" -o /resolvable
